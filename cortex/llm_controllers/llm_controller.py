@@ -36,6 +36,36 @@ class OpenAIController(BaseLLMController):
         )
         return response.choices[0].message.content
 
+class BedrockController(BaseLLMController):
+    def __init__(self, model: str = "anthropic.claude-4-sonnet-20241022-v2:0", region: str = "us-east-1"):
+        try:
+            import boto3
+            self.model = model
+            self.region = region
+            self.client = boto3.client('bedrock-runtime', region_name=region)
+        except Exception as e:
+            raise ImportError(f"Failed to initialize Bedrock client: {e}")
+    
+    def get_completion(self, prompt: str, response_format: dict, temperature: float = 0.7) -> str:
+        messages = [
+            {"role": "user", "content": f"You must respond with a JSON object. {prompt}"}
+        ]
+        
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1000,
+            "temperature": temperature,
+            "messages": messages
+        }
+        
+        response = self.client.invoke_model(
+            modelId=self.model,
+            body=json.dumps(body)
+        )
+        
+        response_body = json.loads(response['body'].read())
+        return response_body['content'][0]['text']
+
 class OllamaController(BaseLLMController):
     def __init__(self, model: str = "llama2"):
         from ollama import chat
@@ -86,15 +116,18 @@ class OllamaController(BaseLLMController):
 class LLMController:
     """LLM-based controller for memory metadata generation"""
     def __init__(self, 
-                 backend: Literal["openai", "ollama"] = "openai",
-                 model: str = "gpt-4", 
-                 api_key: Optional[str] = None):
-        if backend == "openai":
+                 backend: Literal["bedrock", "openai", "ollama"] = "bedrock",
+                 model: str = "anthropic.claude-4-sonnet-20241022-v2:0", 
+                 api_key: Optional[str] = None,
+                 region: str = "us-east-1"):
+        if backend == "bedrock":
+            self.llm = BedrockController(model, region)
+        elif backend == "openai":
             self.llm = OpenAIController(model, api_key)
         elif backend == "ollama":
             self.llm = OllamaController(model)
         else:
-            raise ValueError("Backend must be one of: 'openai', 'ollama'")
+            raise ValueError("Backend must be one of: 'bedrock', 'openai', 'ollama'")
             
     def get_completion(self, prompt: str, response_format: dict = None, temperature: float = 0.7) -> str:
         return self.llm.get_completion(prompt, response_format, temperature)

@@ -7,7 +7,7 @@ import numpy as np
 import tiktoken
 from dotenv import load_dotenv
 from jinja2 import Template
-from openai import OpenAI
+import boto3
 from tqdm import tqdm
 
 load_dotenv()
@@ -25,8 +25,8 @@ PROMPT = """
 
 class RAGManager:
     def __init__(self, data_path="dataset/locomo10_rag.json", chunk_size=500, k=1):
-        self.model = os.getenv("MODEL")
-        self.client = OpenAI()
+        self.model = os.getenv("MODEL", "anthropic.claude-4-sonnet-20241022-v2:0")
+        self.client = boto3.client('bedrock-runtime', region_name='us-east-1')
         self.data_path = data_path
         self.chunk_size = chunk_size
         self.k = k
@@ -44,22 +44,31 @@ class RAGManager:
         while retries <= max_retries:
             try:
                 t1 = time.time()
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system",
-                         "content": "You are a helpful assistant that can answer "
-                                    "questions based on the provided context."
-                                    "If the question involves timing, use the conversation date for reference."
-                                    "Provide the shortest possible answer."
-                                    "Use words directly from the conversation when possible."
-                                    "Avoid using subjects in your answer."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0
+                
+                messages = [{
+                    "role": "user", 
+                    "content": "You are a helpful assistant that can answer questions based on the provided context. "
+                              "If the question involves timing, use the conversation date for reference. "
+                              "Provide the shortest possible answer. "
+                              "Use words directly from the conversation when possible. "
+                              f"Avoid using subjects in your answer.\n\n{prompt}"
+                }]
+                body = {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1000,
+                    "temperature": 0,
+                    "messages": messages
+                }
+                
+                response = self.client.invoke_model(
+                    modelId=self.model,
+                    body=json.dumps(body)
                 )
+                
+                response_body = json.loads(response['body'].read())
+                content = response_body['content'][0]['text']
                 t2 = time.time()
-                return response.choices[0].message.content.strip(), t2-t1
+                return content.strip(), t2-t1
             except Exception as e:
                 retries += 1
                 if retries > max_retries:
@@ -75,11 +84,13 @@ class RAGManager:
         return cleaned_chat_history
 
     def calculate_embedding(self, document):
-        response = self.client.embeddings.create(
-            model=os.getenv("EMBEDDING_MODEL"),
-            input=document
+        body = {"inputText": document}
+        response = self.client.invoke_model(
+            modelId=os.getenv("EMBEDDING_MODEL", "amazon.titan-embed-text-v1"),
+            body=json.dumps(body)
         )
-        return response.data[0].embedding
+        response_body = json.loads(response['body'].read())
+        return response_body['embedding']
 
     def calculate_similarity(self, embedding1, embedding2):
         return np.dot(embedding1, embedding2) / (
@@ -122,10 +133,10 @@ class RAGManager:
 
     def create_chunks(self, chat_history, chunk_size=500):
         """
-        Create chunks using tiktoken for more accurate token counting
+        Create chunks using tiktoken for accurate token counting
         """
-        # Get the encoding for the model
-        encoding = tiktoken.encoding_for_model(os.getenv("EMBEDDING_MODEL"))
+        # Use cl100k_base encoding (compatible with most modern models)
+        encoding = tiktoken.get_encoding("cl100k_base")
 
         documents = self.clean_chat_history(chat_history)
 

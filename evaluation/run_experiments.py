@@ -10,7 +10,7 @@ from src.cortex.search import CortexSearch
 # from src.langmem import LangMemManager
 # from src.memzero.add import MemoryADD
 # from src.memzero.search import MemorySearch
-from src.openai.predict import OpenAIPredict
+from src.bedrock.predict import BedrockPredict
 from src.rag import RAGManager
 from src.utils import METHODS, TECHNIQUES
 # from src.zep.add import ZepAdd
@@ -108,10 +108,10 @@ def main():
     elif args.technique_type == "zep":
         print("zep path not implemented in this workspace.")
         return
-    elif args.technique_type == "openai":
-        output_file_path = os.path.join(args.output_folder, "openai_results.json")
-        openai_manager = OpenAIPredict()
-        openai_manager.process_data_file("dataset/locomo10.json", output_file_path)
+    elif args.technique_type == "bedrock":
+        output_file_path = os.path.join(args.output_folder, "bedrock_results.json")
+        bedrock_manager = BedrockPredict()
+        bedrock_manager.process_data_file("dataset/locomo10.json", output_file_path)
     elif args.technique_type == "fullcontext":
         print("STARTING FULL-CONTEXT EXPERIMENT")
         output_file_path = os.path.join(args.output_folder, "fullcontext_results.json")

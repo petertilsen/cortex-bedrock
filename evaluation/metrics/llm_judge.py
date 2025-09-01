@@ -3,9 +3,9 @@ import json
 from collections import defaultdict
 
 import numpy as np
-from openai import OpenAI
+import boto3
 
-client = OpenAI()
+client = boto3.client('bedrock-runtime', region_name='us-east-1')
 
 ACCURACY_PROMPT = """
 Your task is to label an answer to a question as ’CORRECT’ or ’WRONG’. You will be given the following data:
@@ -35,20 +35,39 @@ Just return the label CORRECT or WRONG in a json format with the key as "label".
 
 def evaluate_llm_judge(question, gold_answer, generated_answer):
     """Evaluate the generated answer against the gold answer using an LLM judge."""
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{
-            "role": "user", 
-            "content": ACCURACY_PROMPT.format(
-                question=question, 
-                gold_answer=gold_answer, 
-                generated_answer=generated_answer
-            )
-        }],
-        response_format={"type": "json_object"},
-        temperature=0.0
+    
+    messages = [{
+        "role": "user", 
+        "content": ACCURACY_PROMPT.format(
+            question=question, 
+            gold_answer=gold_answer, 
+            generated_answer=generated_answer
+        )
+    }]
+    
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1000,
+        "temperature": 0.0,
+        "messages": messages
+    }
+    
+    response = client.invoke_model(
+        modelId="anthropic.claude-3-haiku-20240307-v1:0",
+        body=json.dumps(body)
     )
-    label = json.loads(response.choices[0].message.content)['label']
+    
+    response_body = json.loads(response['body'].read())
+    content = response_body['content'][0]['text']
+    
+    # Extract JSON from the response
+    try:
+        label_data = json.loads(content)
+        label = label_data['label']
+    except:
+        # Fallback parsing if JSON is malformed
+        label = "WRONG" if "WRONG" in content else "CORRECT"
+    
     return 1 if label == "CORRECT" else 0
 
 

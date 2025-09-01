@@ -13,7 +13,7 @@ This project evaluates Mem0 and compares it with different memory and retrieval 
 2. **Open-Source Memory Solutions**: We test promising open-source memory architectures including LangMem, which provides flexible memory management capabilities.
 3. **RAG Systems**: We implement Retrieval-Augmented Generation with various configurations, testing different chunk sizes and retrieval counts to optimize performance.
 4. **Full-Context Processing**: We examine the effectiveness of passing the entire conversation history within the context window of the LLM as a baseline approach.
-5. **Proprietary Memory Systems**: We evaluate OpenAI's built-in memory feature available in their ChatGPT interface to compare against commercial solutions.
+5. **Proprietary Memory Systems**: We evaluate AWS Bedrock's built-in capabilities and compare against commercial solutions.
 6. **Third-Party Memory Providers**: We incorporate Zep, a specialized memory management platform designed for AI agents, to assess the performance of dedicated memory infrastructure.
 
 We test these techniques on the LOCOMO dataset, which contains conversational data with various question types to evaluate memory recall and understanding.
@@ -36,7 +36,7 @@ Place the dataset files in the `dataset/` directory:
 .
 ├── src/                  # Source code for different memory techniques
 │   ├── mem0/             # Implementation of the Mem0 technique
-│   ├── openai/           # Implementation of the OpenAI memory
+│   ├── bedrock/          # Implementation of the Bedrock memory
 │   ├── zep/              # Implementation of the Zep memory
 │   ├── rag.py            # Implementation of the RAG technique
 │   └── langmem.py        # Implementation of the Language-based memory
@@ -56,8 +56,10 @@ Place the dataset files in the `dataset/` directory:
 Create a `.env` file with your API keys and configurations. The following keys are required:
 
 ```
-# OpenAI API key for GPT models and embeddings
-OPENAI_API_KEY="your-openai-api-key"
+# AWS credentials for Bedrock models and embeddings
+AWS_ACCESS_KEY_ID="your-access-key"
+AWS_SECRET_ACCESS_KEY="your-secret-key"
+AWS_DEFAULT_REGION="us-east-1"
 
 # Mem0 API keys (for Mem0 and Mem0+ techniques)
 MEM0_API_KEY="your-mem0-api-key"
@@ -96,8 +98,8 @@ make run-langmem          # Run LangMem
 make run-zep-add          # Add memories using Zep
 make run-zep-search       # Search memories using Zep
 
-# Run OpenAI experiments
-make run-openai           # Run OpenAI experiments
+# Run Bedrock experiments
+make run-bedrock          # Run Bedrock experiments
 ```
 
 Alternatively, you can run experiments directly with custom parameters:

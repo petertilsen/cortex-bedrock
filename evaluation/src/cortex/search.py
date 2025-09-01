@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 from jinja2 import Template
-from openai import OpenAI
+import boto3
 from tqdm import tqdm
 
 from cortex.memory_system import AgenticMemorySystem
@@ -215,13 +215,13 @@ CATEGORY_PROMPTS = {
     """
 }
 
-encoding = tiktoken.encoding_for_model("gpt-4o")
+encoding = tiktoken.get_encoding("cl100k_base")
 
 
 class CortexSearch:
     def __init__(self, output_path='results.json', top_k=DEFAULT_SEARCH_LIMIT*2, memory_system=None, temperature_c5=0.5, print_running_averages=True):
         # Initialize with persistent ChromaDB storage and automatic embedding backend detection
-        # Supports both OpenAI (text-embedding-3-small) and local (all-MiniLM-L6-v2) embeddings
+        # Supports both Bedrock (amazon.titan-embed-text-v1) and local (all-MiniLM-L6-v2) embeddings
         self.memory_system = memory_system or AgenticMemorySystem(
             model_name=DEFAULT_EMBEDDING_MODEL,     # Use constant
             llm_backend=DEFAULT_LLM_BACKEND,        # Use constant  
@@ -231,7 +231,7 @@ class CortexSearch:
             enable_background_processing=False      # Disable for controlled evaluation environment
         )
         self.top_k = top_k
-        self.openai_client = OpenAI()
+        self.bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
         self.results = defaultdict(list)
         self.output_path = output_path
         self.temperature_c5 = temperature_c5  # Temperature for category 5 questions
@@ -393,16 +393,26 @@ class CortexSearch:
             print("RUNNING AVERAGE TOKEN COUNT: ", sum(self.num_tokens_list) / len(self.num_tokens_list))
         
         t1 = time.time()
-        response = self.openai_client.chat.completions.create(
-            model=os.getenv("MODEL", "gpt-4o"),
-            messages=[
-                {"role": "system", "content": answer_prompt}
-            ],
-            temperature=temperature
+        
+        messages = [{"role": "user", "content": answer_prompt}]
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1000,
+            "temperature": temperature,
+            "messages": messages
+        }
+        
+        response = self.bedrock_client.invoke_model(
+            modelId=os.getenv("MODEL", "anthropic.claude-4-sonnet-20241022-v2:0"),
+            body=json.dumps(body)
         )
+        
+        response_body = json.loads(response['body'].read())
+        content = response_body['content'][0]['text']
+        
         t2 = time.time()
         response_time = t2 - t1
-        return response.choices[0].message.content, memories, search_time, response_time
+        return content, memories, search_time, response_time
 
     def process_question(self, val, speaker_a, speaker_b, idx):
         question = val.get('question', '')

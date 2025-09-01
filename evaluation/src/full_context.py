@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from dotenv import load_dotenv
 from jinja2 import Template
-from openai import OpenAI
+import boto3
 from tqdm import tqdm
 
 load_dotenv()
@@ -59,8 +59,8 @@ class FullContextPredict:
     """
 
     def __init__(self, model: str | None = None):
-        self.model = model or os.getenv("MODEL", "gpt-4o")
-        self.openai_client = OpenAI()
+        self.model = model or os.getenv("MODEL", "anthropic.claude-4-sonnet-20241022-v2:0")
+        self.bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
         self.results = defaultdict(list)
 
     @staticmethod
@@ -92,14 +92,26 @@ class FullContextPredict:
         answer_prompt = template.render(memories=context, question=question)
 
         t1 = time.time()
-        response = self.openai_client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": answer_prompt}],
-            temperature=0.0,
+        
+        messages = [{"role": "user", "content": answer_prompt}]
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1000,
+            "temperature": 0.0,
+            "messages": messages
+        }
+        
+        response = self.bedrock_client.invoke_model(
+            modelId=self.model,
+            body=json.dumps(body)
         )
+        
+        response_body = json.loads(response['body'].read())
+        content = response_body['content'][0]['text']
+        
         t2 = time.time()
         response_time = t2 - t1
-        return response.choices[0].message.content, response_time, context
+        return content, response_time, context
 
     def process_data_file(self, file_path: str, output_file_path: str, max_workers: int = 0):
         with open(file_path, 'r') as f:

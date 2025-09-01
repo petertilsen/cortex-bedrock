@@ -12,15 +12,16 @@ DEFAULT_LTM_WORKERS = 1
 DEFAULT_STM_CAPACITY = 20
 
 # Model defaults
-DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small'  # OpenAI by default
+DEFAULT_EMBEDDING_MODEL = 'amazon.titan-embed-text-v1'  # Bedrock by default
 # Alternative local models: 'all-MiniLM-L6-v2', 'all-mpnet-base-v2'
-DEFAULT_LLM_MODEL = "gpt-4o-mini"
-DEFAULT_LLM_BACKEND = "openai"
+DEFAULT_LLM_MODEL = "anthropic.claude-4-sonnet-20241022-v2:0"
+DEFAULT_LLM_BACKEND = "bedrock"
 
-OPENAI_EMBEDDING_MODELS = {
-    'text-embedding-3-small': 1536,
-    'text-embedding-3-large': 3072,
-    'text-embedding-ada-002': 1536
+BEDROCK_EMBEDDING_MODELS = {
+    'amazon.titan-embed-text-v1': 1536,
+    'amazon.titan-embed-text-v2:0': 1024,
+    'cohere.embed-english-v3': 1024,
+    'cohere.embed-multilingual-v3': 1024
 }
 
 LOCAL_EMBEDDING_MODELS = {
@@ -30,9 +31,9 @@ LOCAL_EMBEDDING_MODELS = {
     'sentence-transformers/all-mpnet-base-v2': 768
 }
 
-def is_openai_model(model_name: str) -> bool:
-    """Check if the model is an OpenAI embedding model"""
-    return model_name in OPENAI_EMBEDDING_MODELS
+def is_bedrock_model(model_name: str) -> bool:
+    """Check if the model is a Bedrock embedding model"""
+    return model_name in BEDROCK_EMBEDDING_MODELS
 
 def is_local_model(model_name: str) -> bool:
     """Check if the model is a local SentenceTransformers model"""
@@ -40,8 +41,8 @@ def is_local_model(model_name: str) -> bool:
 
 def get_embedding_dimension(model_name: str) -> int:
     """ embedding dimension for any supported model"""
-    if is_openai_model(model_name):
-        return OPENAI_EMBEDDING_MODELS[model_name]
+    if is_bedrock_model(model_name):
+        return BEDROCK_EMBEDDING_MODELS[model_name]
     elif is_local_model(model_name):
         return LOCAL_EMBEDDING_MODELS[model_name]
     else:

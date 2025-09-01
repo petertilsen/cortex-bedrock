@@ -3,17 +3,17 @@ from typing import List, Dict, Optional
 import logging
 import os
 from cortex.constants import (
-    DEFAULT_EMBEDDING_MODEL, is_openai_model, is_local_model, 
+    DEFAULT_EMBEDDING_MODEL, is_bedrock_model, is_local_model, 
     get_embedding_dimension
 )
 
 logger = logging.getLogger(__name__)
 
 class EmbeddingManager:
-    """Thread-safe singleton manager supporting both OpenAI and local embedding models.
+    """Thread-safe singleton manager supporting both Bedrock and local embedding models.
     
     Automatically detects model type and uses appropriate backend:
-    - OpenAI models: Uses OpenAI API
+    - Bedrock models: Uses AWS Bedrock API
     - Local models: Uses SentenceTransformers
     """
     
@@ -35,30 +35,28 @@ class EmbeddingManager:
             
         self.model_name = model_name
         self._initialized = True
-        self.is_openai = is_openai_model(model_name)
+        self.is_bedrock = is_bedrock_model(model_name)
         self.is_local = is_local_model(model_name)
         
-        if self.is_openai:
-            self._init_openai()
+        if self.is_bedrock:
+            self._init_bedrock()
         elif self.is_local:
             self._init_local()
         else:
-            # Try OpenAI as fallback for unknown models
-            logger.warning(f"Unknown model {model_name}, trying OpenAI backend")
-            self.is_openai = True
-            self._init_openai()
+            # Try Bedrock as fallback for unknown models
+            logger.warning(f"Unknown model {model_name}, trying Bedrock backend")
+            self.is_bedrock = True
+            self._init_bedrock()
 
-    def _init_openai(self):
-        """Initialize OpenAI backend"""
+    def _init_bedrock(self, region: str = "us-east-1"):
+        """Initialize Bedrock backend"""
         try:
-            from openai import OpenAI
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY environment variable is required for OpenAI embeddings")
-            self.client = OpenAI(api_key=api_key)
-            logger.info(f"Created EmbeddingManager for OpenAI model: {self.model_name}")
+            import boto3
+            self.region = region
+            self.client = boto3.client('bedrock-runtime', region_name=region)
+            logger.info(f"Created EmbeddingManager for Bedrock model: {self.model_name}")
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI backend: {e}")
+            logger.error(f"Failed to initialize Bedrock backend: {e}")
             raise
 
     def _init_local(self):
@@ -85,8 +83,8 @@ class EmbeddingManager:
             return [0.0] * self.get_embedding_dimension()
         
         try:
-            if self.is_openai:
-                return self._get_openai_embedding(content.strip())
+            if self.is_bedrock:
+                return self._get_bedrock_embedding(content.strip())
             else:
                 return self._get_local_embedding(content.strip())
         except Exception as e:
@@ -94,13 +92,21 @@ class EmbeddingManager:
             # Return zero embedding as fallback
             return [0.0] * self.get_embedding_dimension()
 
-    def _get_openai_embedding(self, content: str) -> List[float]:
-        """ get OpenAI embedding"""
-        response = self.client.embeddings.create(
-            model=self.model_name,
-            input=content
+    def _get_bedrock_embedding(self, content: str) -> List[float]:
+        """Get Bedrock embedding"""
+        import json
+        
+        body = {
+            "inputText": content
+        }
+        
+        response = self.client.invoke_model(
+            modelId=self.model_name,
+            body=json.dumps(body)
         )
-        return response.data[0].embedding
+        
+        response_body = json.loads(response['body'].read())
+        return response_body['embedding']
 
     def _get_local_embedding(self, content: str) -> List[float]:
         """ get local SentenceTransformers embedding"""
@@ -123,8 +129,8 @@ class EmbeddingManager:
                 processed_contents.append(content.strip())
         
         try:
-            if self.is_openai:
-                return self._get_openai_embeddings(processed_contents, empty_indices)
+            if self.is_bedrock:
+                return self._get_bedrock_embeddings(processed_contents, empty_indices)
             else:
                 return self._get_local_embeddings(processed_contents, empty_indices)
         except Exception as e:
@@ -133,8 +139,10 @@ class EmbeddingManager:
             dim = self.get_embedding_dimension()
             return [[0.0] * dim for _ in contents]
 
-    def _get_openai_embeddings(self, processed_contents: List[str], empty_indices: List[int]) -> List[List[float]]:
-        """get batch OpenAI embeddings"""
+    def _get_bedrock_embeddings(self, processed_contents: List[str], empty_indices: List[int]) -> List[List[float]]:
+        """Get batch Bedrock embeddings"""
+        import json
+        
         # Filter out empty contents for API call
         non_empty_contents = [c for c in processed_contents if c]
         
@@ -142,11 +150,16 @@ class EmbeddingManager:
             dim = self.get_embedding_dimension()
             return [[0.0] * dim for _ in processed_contents]
         
-        # Use OpenAI batch embedding API
-        response = self.client.embeddings.create(
-            model=self.model_name,
-            input=non_empty_contents
-        )
+        # Get embeddings one by one (Bedrock doesn't support batch)
+        batch_embeddings = []
+        for content in non_empty_contents:
+            body = {"inputText": content}
+            response = self.client.invoke_model(
+                modelId=self.model_name,
+                body=json.dumps(body)
+            )
+            response_body = json.loads(response['body'].read())
+            batch_embeddings.append(response_body['embedding'])
         
         # Reconstruct full list with zero embeddings for empty contents
         embeddings = []
@@ -157,7 +170,7 @@ class EmbeddingManager:
             if i in empty_indices:
                 embeddings.append([0.0] * dim)
             else:
-                embeddings.append(response.data[non_empty_idx].embedding)
+                embeddings.append(batch_embeddings[non_empty_idx])
                 non_empty_idx += 1
                 
         return embeddings

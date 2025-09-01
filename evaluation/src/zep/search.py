@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from dotenv import load_dotenv
 from jinja2 import Template
-from openai import OpenAI
+import boto3
 from prompts import ANSWER_PROMPT_ZEP
 from tqdm import tqdm
 from zep_cloud import EntityEdge, EntityNode
@@ -35,7 +35,7 @@ class ZepSearch:
     def __init__(self):
         self.zep_client = Zep(api_key=os.getenv("ZEP_API_KEY"))
         self.results = defaultdict(list)
-        self.openai_client = OpenAI()
+        self.bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
 
     def format_edge_date_range(self, edge: EntityEdge) -> str:
         # return f"{datetime(edge.valid_at).strftime('%Y-%m-%d %H:%M:%S') if edge.valid_at else 'date unknown'} - {(edge.invalid_at.strftime('%Y-%m-%d %H:%M:%S') if edge.invalid_at else 'present')}"
@@ -104,16 +104,26 @@ class ZepSearch:
         )
 
         t1 = time.time()
-        response = self.openai_client.chat.completions.create(
-            model=os.getenv("MODEL"),
-            messages=[
-                {"role": "system", "content": answer_prompt}
-            ],
-            temperature=0.0
+        
+        messages = [{"role": "user", "content": answer_prompt}]
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1000,
+            "temperature": 0.0,
+            "messages": messages
+        }
+        
+        response = self.bedrock_client.invoke_model(
+            modelId=os.getenv("MODEL", "anthropic.claude-4-sonnet-20241022-v2:0"),
+            body=json.dumps(body)
         )
+        
+        response_body = json.loads(response['body'].read())
+        content = response_body['content'][0]['text']
+        
         t2 = time.time()
         response_time = t2 - t1
-        return response.choices[0].message.content, search_memory_time, response_time, context
+        return content, search_memory_time, response_time, context
 
     def process_data_file(self, file_path, run_id, output_file_path):
         with open(file_path, 'r') as f:

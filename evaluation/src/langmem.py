@@ -11,13 +11,13 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.store.memory import InMemoryStore
 from langgraph.utils.config import get_store
 from langmem import create_manage_memory_tool, create_search_memory_tool
-from openai import OpenAI
+import boto3
 from prompts import ANSWER_PROMPT
 from tqdm import tqdm
 
 load_dotenv()
 
-client = OpenAI()
+client = boto3.client('bedrock-runtime', region_name='us-east-1')
 
 ANSWER_PROMPT_TEMPLATE = Template(ANSWER_PROMPT)
 
@@ -63,13 +63,13 @@ class LangMem:
         self.store = InMemoryStore(
             index={
                 "dims": 1536,
-                "embed": f"openai:{os.getenv('EMBEDDING_MODEL')}",
+                "embed": f"bedrock:{os.getenv('EMBEDDING_MODEL', 'amazon.titan-embed-text-v1')}",
             }
         )
         self.checkpointer = MemorySaver()  # Checkpoint graph state
 
         self.agent = create_react_agent(
-            f"openai:{os.getenv('MODEL')}",
+            f"bedrock:{os.getenv('MODEL', 'anthropic.claude-4-sonnet-20241022-v2:0')}",
             prompt=prompt,
             tools=[
                 create_manage_memory_tool(namespace=("memories",)),

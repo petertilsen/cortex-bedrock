@@ -3,7 +3,7 @@ TECHNIQUES = [
     "rag",
     "langmem",
     "zep",
-    "openai",
+    "bedrock",
     "cortex",
     "fullcontext",
 ]

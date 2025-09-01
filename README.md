@@ -36,19 +36,21 @@ A memory system for AI agents that stores, retrieves, and evolves information ov
 - **Hybrid Retrieval**: Combines global search + domain-aware search with intelligent query enhancement
 - **Multi-User Support**: Complete isolation by user and session with shared efficiency
 - **Production-Ready**: Background processing, composite scoring, enterprise-scale performance
-- **Universal Integration**: Works with OpenAI, Ollama, or any LLM/embedding backend
+- **Universal Integration**: Works with AWS Bedrock, OpenAI, Ollama, or any LLM/embedding backend
 
 ## Installation
 
-**Requirements**: Python 3.11+, [Poetry (for dependency management)](https://python-poetry.org/docs/#installation), 4GB+ RAM, OpenAI API key (or Ollama uri for self-hosted)
+**Requirements**: Python 3.11+, [Poetry (for dependency management)](https://python-poetry.org/docs/#installation), 4GB+ RAM, AWS credentials for Bedrock (or OpenAI API key/Ollama uri for alternatives)
 
 ```bash
 git clone https://github.com/prem-research/cortex.git
 cd cortex
 poetry install
 
-# Set your API key
-echo "OPENAI_API_KEY=your_key_here" > .env
+# Set your AWS credentials (if not using IAM roles)
+echo "AWS_ACCESS_KEY_ID=your_access_key" > .env
+echo "AWS_SECRET_ACCESS_KEY=your_secret_key" >> .env
+echo "AWS_DEFAULT_REGION=us-east-1" >> .env
 ```
 
 ### ChromaDB Server Setup
@@ -81,9 +83,11 @@ from cortex.memory_system import AgenticMemorySystem
 from dotenv import load_dotenv
 load_dotenv(".env")
 
-# Initialize with your OpenAI key
+# Initialize with AWS Bedrock (default)
 memory = AgenticMemorySystem(
-    api_key=os.getenv("OPENAI_API_KEY"),
+    llm_backend="bedrock",
+    llm_model="anthropic.claude-4-sonnet-20241022-v2:0",
+    model_name="amazon.titan-embed-text-v1",
     enable_smart_collections=False,
 )
 
@@ -96,7 +100,9 @@ print(results[0]['content'])  # "User prefers morning meetings and uses VS Code"
 
 # Enable Smart Collections for mixed domains (work + personal + hobbies)
 smart_memory = AgenticMemorySystem(
-    api_key=os.getenv("OPENAI_API_KEY"),
+    llm_backend="bedrock",
+    llm_model="anthropic.claude-4-sonnet-20241022-v2:0",
+    model_name="amazon.titan-embed-text-v1",
     enable_smart_collections=True  # Prevents category fragmentation at scale
 )
 ```
@@ -115,14 +121,12 @@ load_dotenv(".env")
 try:
     # Initialize the memory system
     memory_system = AgenticMemorySystem(
-        #model_name='all-MiniLM-L6-v2',  # Embedding model
-        model_name='text-embedding-3-small',  # Embedding model
-        llm_backend="openai",           # LLM provider
-        #llm_model="gpt-4o-mini",        # LLM model
+        model_name='amazon.titan-embed-text-v1',  # Embedding model
+        llm_backend="bedrock",           # LLM provider
+        llm_model="anthropic.claude-4-sonnet-20241022-v2:0",        # LLM model
         enable_smart_collections=True,      # Knob 1: Domain organization
     enable_background_processing=True,  # Knob 2: Async vs sync
         stm_capacity=10,               # STM capacity
-        api_key=os.getenv("OPENAI_API_KEY")
     )
 
     # Stores memories with timestamps
@@ -291,10 +295,10 @@ from pydantic import BaseModel, Field
 from langchain.tools import StructuredTool
 from cortex.memory_system import AgenticMemorySystem
 
-api_key = os.getenv("OPENAI_API_KEY")
 memory = AgenticMemorySystem(
-    api_key=api_key,
-    enable_smart_collections=bool(api_key),
+    llm_backend="bedrock",
+    llm_model="anthropic.claude-4-sonnet-20241022-v2:0",
+    enable_smart_collections=True,
     model_name="all-MiniLM-L6-v2",
     enable_background_processing=False,
 )
@@ -798,10 +802,9 @@ Cortex can be configured in several ways:
 ```python
 memory_system = AgenticMemorySystem(
     model_name='all-MiniLM-L6-v2',  # Embedding model
-    llm_backend="openai",          
-    llm_model="gpt-4o-mini",       
+    llm_backend="bedrock",          
+    llm_model="anthropic.claude-4-sonnet-20241022-v2:0",       
     stm_capacity=100,              
-    api_key=None,
 )
 ```
 
@@ -924,7 +927,7 @@ Cortex delivers state-of-the-art accuracy at comparable token budgets while trad
 - Zep: 0.660 at ~3,911 tokens
 - LangMem: 0.581 at 127 tokens
 - A‑Mem: 0.483 at ~2,520 tokens
-- OpenAI baseline: 0.529 at ~4,437 tokens
+- Bedrock baseline: 0.529 at ~4,437 tokens
 - Full‑context: 0.8266 at ~26k tokens (all turns)
 
 ### Performance Visualizations
@@ -1054,4 +1057,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [mem0](https://github.com/mem0ai/mem0) for the evaluation scripts and benchmarks
 - [LoCoMo10](https://github.com/mem0ai/mem0/tree/main/evaluation/datasets/LoCoMo10) for the dataset
 - [ChromaDB](https://www.trychroma.com/) for the vector database
-- [OpenAI](https://openai.com/) and [Ollama](https://ollama.ai/) for the LLM backends
+- [AWS Bedrock](https://aws.amazon.com/bedrock/), [OpenAI](https://openai.com/) and [Ollama](https://ollama.ai/) for the LLM backends

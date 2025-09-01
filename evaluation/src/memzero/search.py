@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 from jinja2 import Template
-from openai import OpenAI
+import boto3
 from prompts import ANSWER_PROMPT, ANSWER_PROMPT_GRAPH
 from tqdm import tqdm
 
@@ -24,7 +24,7 @@ class MemorySearch:
             project_id=os.getenv("MEM0_PROJECT_ID")
         )
         self.top_k = top_k
-        self.openai_client = OpenAI()
+        self.bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
         self.results = defaultdict(list)
         self.output_path = output_path
         self.filter_memories = filter_memories
@@ -90,16 +90,26 @@ class MemorySearch:
         )
 
         t1 = time.time()
-        response = self.openai_client.chat.completions.create(
-            model=os.getenv("MODEL"),
-            messages=[
-                {"role": "system", "content": answer_prompt}
-            ],
-            temperature=0.0
+        
+        messages = [{"role": "user", "content": answer_prompt}]
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1000,
+            "temperature": 0.0,
+            "messages": messages
+        }
+        
+        response = self.bedrock_client.invoke_model(
+            modelId=os.getenv("MODEL", "anthropic.claude-4-sonnet-20241022-v2:0"),
+            body=json.dumps(body)
         )
+        
+        response_body = json.loads(response['body'].read())
+        content = response_body['content'][0]['text']
+        
         t2 = time.time()
         response_time = t2 - t1
-        return response.choices[0].message.content, speaker_1_memories, speaker_2_memories, speaker_1_memory_time, speaker_2_memory_time, speaker_1_graph_memories, speaker_2_graph_memories, response_time
+        return content, speaker_1_memories, speaker_2_memories, speaker_1_memory_time, speaker_2_memory_time, speaker_1_graph_memories, speaker_2_graph_memories, response_time
 
     def process_question(self, val, speaker_a_user_id, speaker_b_user_id):
         question = val.get('question', '')

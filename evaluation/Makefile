@@ -28,4 +28,4 @@ run-zep-search:
 	python run_experiments.py --technique_type zep --method search --output_folder results/
 
 run-bedrock:
-	python run_experiments.py --technique_type bedrock --output_folder results/
+	python3 run_experiments.py --technique_type bedrock --output_folder results/

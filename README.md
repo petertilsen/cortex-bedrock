@@ -62,7 +62,7 @@ Cortex requires a persistent ChromaDB server for vector storage. Start it locall
 poetry add chromadb
 
 # Start ChromaDB server locally
-poetry run chroma run --host localhost --port 8003
+poetry run chroma run --host localhost --port 8000
 
 # Or using Docker
 docker run -p 8000:8000 chromadb/chroma:latest
@@ -75,7 +75,7 @@ docker run -p 8000:8000 chromadb/chroma:latest
 **Prerequisites**:
 Start ChromaDB server first: 
 ```bash
-poetry run chroma run --host localhost --port 8003
+poetry run chroma run --host localhost --port 8000
 ```
 
 ```python

@@ -299,7 +299,7 @@ memory = AgenticMemorySystem(
     llm_backend="bedrock",
     llm_model="anthropic.claude-4-sonnet-20241022-v2:0",
     enable_smart_collections=True,
-    model_name="all-MiniLM-L6-v2",
+    model_name="amazon.titan-embed-text-v1",
     enable_background_processing=False,
 )
 
@@ -801,7 +801,7 @@ Cortex can be configured in several ways:
 
 ```python
 memory_system = AgenticMemorySystem(
-    model_name='all-MiniLM-L6-v2',  # Embedding model
+    model_name='amazon.titan-embed-text-v1',  # Embedding model
     llm_backend="bedrock",          
     llm_model="anthropic.claude-4-sonnet-20241022-v2:0",       
     stm_capacity=100,              
@@ -847,7 +847,7 @@ personal_assistant = AgenticMemorySystem(
 # Enterprise Knowledge Base
 enterprise_system = AgenticMemorySystem(
     stm_capacity=200,
-    model_name="text-embedding-3-small",
+    model_name="amazon.titan-embed-text-v1",
     enable_smart_collections=True  # Multiple teams/projects
 )
 
@@ -993,8 +993,8 @@ For production environments:
 # High-performance configuration
 memory_system = AgenticMemorySystem(
     stm_capacity=200,              # Increase for more recent context
-    model_name='all-MiniLM-L6-v2', # Fast, efficient embedding model
-    llm_model="gpt-4o-mini"        # LLM
+    model_name='amazon.titan-embed-text-v1', # Fast, efficient embedding model
+    llm_model="anthropic.claude-3-haiku-20240307-v1:0"        # LLM
 )
 ```
 
